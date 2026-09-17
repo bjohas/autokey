@@ -129,13 +129,17 @@ class Folder(AbstractAbbreviation, AbstractHotkey, AbstractWindowFilter):
     def inject_json_data(self, data):
         self.title = data["title"]
 
-        self.modes = [TriggerMode(item) for item in data["modes"]]
         self.usageCount = data["usageCount"]
         self.show_in_tray_menu = data["showInTrayMenu"]
 
         AbstractAbbreviation.load_from_serialized(self, data["abbreviation"])
         AbstractHotkey.load_from_serialized(self, data["hotkey"])
         AbstractWindowFilter.load_from_serialized(self, data["filter"])
+
+        # Restore trigger modes LAST. AbstractHotkey.set_hotkey() force-adds
+        # TriggerMode.HOTKEY whenever a hotkey is recorded, so assigning modes
+        # before it resurrects hotkeys on items the user disabled (modes: []).
+        self.modes = [TriggerMode(item) for item in data["modes"]]
 
     def rebuild_path(self):
         if self.path is not None:
