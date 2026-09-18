@@ -253,6 +253,20 @@ class XInterfaceBase(threading.Thread):
         self.queue.put_nowait((method, args))
 
     def on_keys_changed(self, data=None):
+        # A MappingNotify does not mean the mapping actually differs. Other clients
+        # re-apply the same keyboard mapping wholesale, and AutoKey itself rewrites
+        # the map to borrow spare keycodes. Both are common, and regrabbing every
+        # hotkey costs thousands of XGrabKey round-trips, so compare first.
+        try:
+            current = self.localDisplay.get_keyboard_mapping(8, 248)
+        except Exception:
+            current = None
+
+        if current is not None and current == self.__lastKeyboardMapping:
+            logger.debug("Keymap event with no actual change - not regrabbing")
+            return
+        self.__lastKeyboardMapping = current
+
         if not self.__ignoreRemap:
             logger.debug("Recorded keymap change event")
             self.__ignoreRemap = True
@@ -268,6 +282,12 @@ class XInterfaceBase(threading.Thread):
 
     def __initMappings(self):
         self.localDisplay = display.Display()
+        # Remembered so on_keys_changed() can tell a real keymap change from a
+        # re-application of the same mapping. See the comment there.
+        try:
+            self.__lastKeyboardMapping = self.localDisplay.get_keyboard_mapping(8, 248)
+        except Exception:
+            self.__lastKeyboardMapping = None
         self.rootWindow = self.localDisplay.screen().root
         self.rootWindow.change_attributes(event_mask=X.SubstructureNotifyMask|X.StructureNotifyMask)
         
@@ -752,6 +772,14 @@ class XInterfaceBase(threading.Thread):
             mapping = [tuple(l) for l in mapping]
             self.localDisplay.change_keyboard_mapping(firstCode, mapping)
             self.localDisplay.flush()
+            # Record the mapping we just wrote, so the MappingNotify it provokes
+            # compares equal and does not trigger a regrab. __ignoreRemap alone
+            # cannot do this: it is cleared once the string has been sent, while
+            # the event arrives asynchronously, often later.
+            try:
+                self.__lastKeyboardMapping = self.localDisplay.get_keyboard_mapping(8, 248)
+            except Exception:
+                self.__lastKeyboardMapping = None
 
         focus = self.localDisplay.get_input_focus().focus
 
