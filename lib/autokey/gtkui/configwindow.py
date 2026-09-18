@@ -48,6 +48,7 @@ import autokey.configmanager.configmanager_constants as cm_constants
 
 import autokey.iomediator.keygrabber
 from autokey import common
+from autokey import UI_common_functions as UI_common
 
 CONFIG_WINDOW_TITLE = "AutoKey"
 
@@ -164,7 +165,8 @@ class SettingsWidget:
         self.filterEnabled = False
         self.clearFilterButton.set_sensitive(False)
         if item.has_filter() or item.inherits_filter():
-            self.windowFilterLabel.set_text(item.get_filter_regex())
+            self.windowFilterLabel.set_text(UI_common.format_window_filter_label(
+                item.get_filter_regex(), item.get_applicable_filter_inverted()))
 
             if not item.inherits_filter():
                 self.clearFilterButton.set_sensitive(True)
@@ -307,7 +309,8 @@ class SettingsWidget:
             if filterText != "":
                 self.filterEnabled = True
                 self.clearFilterButton.set_sensitive(True)
-                self.windowFilterLabel.set_text(filterText)
+                self.windowFilterLabel.set_text(UI_common.format_window_filter_label(
+                    filterText, self.filterDialog.get_is_inverted()))
             else:
                 self.filterEnabled = False
                 self.clearFilterButton.set_sensitive(False)
