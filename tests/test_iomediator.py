@@ -20,6 +20,10 @@ from hamcrest import *
 
 import autokey.iomediator.constants as iomediator_constants
 import autokey.model.key
+from unittest.mock import MagicMock
+
+from autokey.iomediator.iomediator import IoMediator
+from autokey.model.key import Key
 
 
 def generate_tests_for_key_split_re():
@@ -39,3 +43,45 @@ def test_key_split_re(input_string: str, expected_split: typing.List[str]):
         autokey.model.key.KEY_SPLIT_RE.split(input_string),
         has_items(*expected_split)
     )
+
+
+def test_clear_modifiers_uses_xtest_not_xsendevent():
+    """
+    Held modifiers must be released via IoMediator.release_key(), which routes to
+    interface.fake_keyup() and XTEST. interface.release_key() sends an XSendEvent,
+    which is delivered to a client but never enters the server's input pipeline, so
+    the modifier stays held and every character of an expansion arrives modified.
+    """
+    mediator = MagicMock()
+    mediator.releasedModifiers = []
+    mediator.modifiers = {Key.CONTROL: True, Key.HYPER: True, Key.SHIFT: False}
+
+    IoMediator._clear_modifiers(mediator)
+
+    assert_that(mediator.releasedModifiers, contains_inanyorder(Key.CONTROL, Key.HYPER))
+    assert_that(mediator.release_key.call_count, is_(2))
+    mediator.interface.release_key.assert_not_called()
+
+
+def test_reapply_modifiers_uses_xtest_not_xsendevent():
+    mediator = MagicMock()
+    mediator.releasedModifiers = [Key.CONTROL, Key.HYPER]
+
+    IoMediator._reapply_modifiers(mediator)
+
+    assert_that(mediator.press_key.call_count, is_(2))
+    mediator.interface.press_key.assert_not_called()
+
+
+def test_modifier_keysyms_resolve_to_the_left_hand_variant():
+    """
+    XK_TO_AK_MAP maps both variants of each modifier onto one Key, so inverting it
+    silently keeps the right-hand one. Releasing Hyper_R does not clear a Hyper_L
+    the user is physically holding.
+    """
+    from Xlib import XK
+    from autokey.interface import AK_TO_XK_MAP
+
+    assert_that(AK_TO_XK_MAP[Key.HYPER], is_(XK.XK_Hyper_L))
+    assert_that(AK_TO_XK_MAP[Key.CONTROL], is_(XK.XK_Control_L))
+    assert_that(AK_TO_XK_MAP[Key.SHIFT], is_(XK.XK_Shift_L))

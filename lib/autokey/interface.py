@@ -1442,6 +1442,17 @@ XK_TO_AK_MAP = {
 
 AK_TO_XK_MAP = dict((v,k) for k, v in XK_TO_AK_MAP.items())
 
+# XK_TO_AK_MAP maps both the left and right variant of each modifier onto one
+# Key, so inverting it keeps whichever happened to come last -- the right-hand
+# one. AutoKey would then release e.g. Hyper_R while the user is holding Hyper_L,
+# which does not clear the modifier. Pin the left variants explicitly.
+AK_TO_XK_MAP[Key.SHIFT] = XK.XK_Shift_L
+AK_TO_XK_MAP[Key.CONTROL] = XK.XK_Control_L
+AK_TO_XK_MAP[Key.ALT] = XK.XK_Alt_L
+AK_TO_XK_MAP[Key.SUPER] = XK.XK_Super_L
+AK_TO_XK_MAP[Key.HYPER] = XK.XK_Hyper_L
+AK_TO_XK_MAP[Key.META] = XK.XK_Meta_L
+
 XK_TO_AK_NUMLOCKED = {
            XK.XK_KP_Insert: "0",
            XK.XK_KP_Delete: ".",
