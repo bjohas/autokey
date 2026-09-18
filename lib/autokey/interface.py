@@ -390,7 +390,7 @@ class XInterfaceBase(threading.Thread):
                 
                 if window_info.wm_title or window_info.wm_class:
                     for item in hotkeys:
-                        if item.get_applicable_regex() is not None and item._should_trigger_window_title(window_info):
+                        if item.get_applicable_regex() is not None and item._should_grab_on_window(window_info):
                             self.__grabHotkey(item.hotKey, item.modifiers, window)
                             self.__grabRecurse(item, window, False)
                         
@@ -434,7 +434,7 @@ class XInterfaceBase(threading.Thread):
                 
                 if window_info.wm_title or window_info.wm_class:
                     for item in hotkeys:
-                        if item.get_applicable_regex() is not None and item._should_trigger_window_title(window_info):
+                        if item.get_applicable_regex() is not None and item._should_grab_on_window(window_info):
                             self.__ungrabHotkey(item.hotKey, item.modifiers, window)
                             self.__ungrabRecurse(item, window, False)
                         
@@ -494,6 +494,12 @@ class XInterfaceBase(threading.Thread):
             if self.__needsMutterWorkaround(item):
                 self.__enqueue(self.__grabRecurse, item, self.rootWindow, False)
         else:
+            # Filtered items, including inverted ("all windows except...") ones, must
+            # take the per-window walk rather than a root grab. An inverted filter
+            # looks global, but grabbing on the root would consume the key in the very
+            # windows the user excluded: the grab happens, then the filter is
+            # re-checked at trigger time and declines to fire, so the keystroke is
+            # swallowed and never reaches the application.
             self.__enqueue(self.__grabRecurse, item, self.rootWindow)
 
     def __grabRecurse(self, item, parent, checkWinInfo=True):
@@ -507,7 +513,7 @@ class XInterfaceBase(threading.Thread):
             
             if checkWinInfo:
                 window_info = self.get_window_info(window, False)
-                shouldTrigger = item._should_trigger_window_title(window_info)
+                shouldTrigger = item._should_grab_on_window(window_info)
 
             if shouldTrigger or not checkWinInfo:
                 self.__grabHotkey(item.hotKey, item.modifiers, window)
@@ -530,6 +536,12 @@ class XInterfaceBase(threading.Thread):
             if self.__needsMutterWorkaround(item):
                 self.__enqueue(self.__ungrabRecurse, newItem, self.rootWindow, False)
         else:
+            # Filtered items, including inverted ("all windows except...") ones, must
+            # take the per-window walk rather than a root grab. An inverted filter
+            # looks global, but grabbing on the root would consume the key in the very
+            # windows the user excluded: the grab happens, then the filter is
+            # re-checked at trigger time and declines to fire, so the keystroke is
+            # swallowed and never reaches the application.
             self.__enqueue(self.__ungrabRecurse, newItem, self.rootWindow)
 
     def __ungrabRecurse(self, item, parent, checkWinInfo=True):
@@ -543,7 +555,7 @@ class XInterfaceBase(threading.Thread):
             
             if checkWinInfo:
                 window_info = self.get_window_info(window, False)
-                shouldTrigger = item._should_trigger_window_title(window_info)
+                shouldTrigger = item._should_grab_on_window(window_info)
 
             if shouldTrigger or not checkWinInfo:
                 self.__ungrabHotkey(item.hotKey, item.modifiers, window)
