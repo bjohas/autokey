@@ -124,3 +124,23 @@ def test_clear_modifiers_keeps_modifiers_the_string_reapplies():
 ])
 def test_modifiers_applied_by(string, expected):
     assert_that(IoMediator._modifiers_applied_by(MagicMock(), string), is_(expected))
+
+
+@pytest.mark.parametrize("string, types_chars", [
+    # Explicit key combinations and special keys type nothing.
+    ["<ctrl>+<np_page_up>", False],
+    ["<ctrl>+<shift>+<f5>", False],
+    ["<ctrl>+v", False],
+    ["<enter>", False],
+    # Anything with literal text does.
+    ["2026-09-18", True],
+    ["hello <ctrl>+a there", True],
+])
+def test_types_characters(string, types_chars):
+    """
+    Held modifiers are cleared so they cannot corrupt typed text. A string that
+    only sends a key combination types nothing, so there is nothing to protect --
+    and releasing a modifier the user is holding disturbs the receiving
+    application: Chrome drops or delays the synthetic key that follows.
+    """
+    assert_that(IoMediator._types_characters(MagicMock(), string), is_(types_chars))

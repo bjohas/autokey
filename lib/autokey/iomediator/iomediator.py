@@ -159,7 +159,14 @@ class IoMediator(threading.Thread):
         # while the user is still physically holding it, and the receiving
         # application sees the modifier go down, up, down and up again. Leaving it
         # alone keeps the state the application sees consistent.
-        self._clear_modifiers(keep=self._modifiers_applied_by(string))
+        # Only clear when the string actually types characters. Clearing exists so
+        # that held modifiers do not corrupt typed text; a string that only sends an
+        # explicit key combination, such as "<ctrl>+<page_up>", types nothing and has
+        # nothing to protect. Releasing for those disturbs the receiving application
+        # for no benefit: Chrome measurably drops or delays the synthetic key that
+        # follows a real modifier release, losing around 40% of rapid presses.
+        if self._types_characters(string):
+            self._clear_modifiers(keep=self._modifiers_applied_by(string))
         modifiers = []
         for section in KEY_SPLIT_RE.split(string):
             if len(section) > 0:
@@ -254,6 +261,30 @@ class IoMediator(threading.Thread):
         
     # Utility methods ----
     
+    def _types_characters(self, string):
+        """
+        Whether this string will type literal characters, as opposed to only
+        sending special keys and explicit modifier combinations. Mirrors how
+        send_string() below parses the string.
+        """
+        modifiers = []
+        for section in KEY_SPLIT_RE.split(string):
+            if not section:
+                continue
+            if section[-1] == '+' and Key.is_key(section[:-1]) and section[:-1] in MODIFIERS:
+                modifiers.append(section[:-1])
+                continue
+            if modifiers:
+                # The combination consumes one key; anything after it is literal.
+                modifiers = []
+                if not Key.is_key(section) and len(section) > 1:
+                    return True
+                continue
+            if Key.is_key(section):
+                continue
+            return True
+        return False
+
     def _modifiers_applied_by(self, string):
         """
         The modifiers this string will apply itself, e.g. {'<ctrl>'} for
