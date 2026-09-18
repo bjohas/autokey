@@ -254,11 +254,16 @@ class IoMediator(threading.Thread):
         for modifier in list(self.modifiers.keys()):
             if self.modifiers[modifier] and modifier not in (Key.CAPSLOCK, Key.NUMLOCK):
                 self.releasedModifiers.append(modifier)
-                self.interface.release_key(modifier)
+                # IoMediator.release_key(), not interface.release_key(): the latter
+                # sends an XSendEvent, which is delivered to a client but never
+                # enters the server's input pipeline, so the held modifier is not
+                # actually cleared. IoMediator.release_key() routes to fake_keyup()
+                # and XTEST, which does clear it.
+                self.release_key(modifier)
 
     def _reapply_modifiers(self):
         for modifier in self.releasedModifiers:
-            self.interface.press_key(modifier)
+            self.press_key(modifier)
 
     def _get_modifiers_on(self):
         modifiers = []
