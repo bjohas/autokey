@@ -17,7 +17,7 @@ import pytest
 from hamcrest import *
 
 from autokey.model.abstract_window_filter import AbstractWindowFilter
-from autokey.sys_interface.abstract_interface import WindowInfo
+from autokey.interface import WindowInfo
 
 
 class FilterItem(AbstractWindowFilter):
