@@ -262,8 +262,21 @@ class IoMediator(threading.Thread):
                 self.release_key(modifier)
 
     def _reapply_modifiers(self):
-        for modifier in self.releasedModifiers:
-            self.press_key(modifier)
+        # Deliberately does not press anything.
+        #
+        # This used to call interface.press_key(), an XSendEvent that never reached
+        # the X server's input pipeline, so for years it was in effect a no-op.
+        # Routing _clear_modifiers() to XTEST (so the release actually works) turns
+        # this into a real key press, and that is dangerous: if the user has let go
+        # of the modifier while the expansion was typing, the re-press puts it
+        # genuinely down with no physical release coming, and it sticks. The visible
+        # result is a keyboard stuck in shift or control until the user presses and
+        # releases the modifier by hand.
+        #
+        # Not restoring is the safe direction. The cost is only that a modifier the
+        # user is still holding stays logically up until they release and press it
+        # again, which is exactly the behaviour 0.96.0 shipped.
+        self.releasedModifiers = []
 
     def _get_modifiers_on(self):
         modifiers = []

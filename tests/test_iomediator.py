@@ -63,14 +63,27 @@ def test_clear_modifiers_uses_xtest_not_xsendevent():
     mediator.interface.release_key.assert_not_called()
 
 
-def test_reapply_modifiers_uses_xtest_not_xsendevent():
+def test_reapply_modifiers_does_not_resurrect_a_released_modifier():
+    """
+    _reapply_modifiers() must not press anything.
+
+    While the release went out as an XSendEvent it was in effect a no-op, so
+    re-pressing was harmless. Once the release actually works (XTEST), a re-press
+    is a real key press: if the user let go of the modifier while the expansion was
+    typing, it goes down with no physical release coming and sticks, leaving the
+    keyboard in shift or control until the user clears it by hand.
+
+    Observed in the wild with a script bound to <alt>+<ctrl>+<hyper>+<shift>+,
+    which slept 100ms before typing -- easily long enough to let go.
+    """
     mediator = MagicMock()
     mediator.releasedModifiers = [Key.CONTROL, Key.HYPER]
 
     IoMediator._reapply_modifiers(mediator)
 
-    assert_that(mediator.press_key.call_count, is_(2))
+    mediator.press_key.assert_not_called()
     mediator.interface.press_key.assert_not_called()
+    assert_that(mediator.releasedModifiers, is_([]))
 
 
 def test_modifier_keysyms_resolve_to_the_left_hand_variant():
