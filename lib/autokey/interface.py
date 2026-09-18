@@ -522,6 +522,20 @@ class XInterfaceBase(threading.Thread):
             # swallowed and never reaches the application.
             self.__enqueue(self.__grabRecurse, item, self.rootWindow)
 
+    def __isViewable(self, window):
+        """
+        Whether a passive key grab on this window could ever activate.
+
+        A grab fires only when the grab window is an ancestor of (or is) the focus
+        window, so an unmapped window can never deliver one. Most windows are
+        unmapped -- 93 of 113 top-level ones on one desktop -- so grabbing them is
+        the bulk of the work in a regrab, and all of it wasted.
+        """
+        try:
+            return window.get_attributes().map_state == X.IsViewable
+        except Exception:
+            return False
+
     def __grabRecurse(self, item, parent, checkWinInfo=True):
         try:
             children = parent.query_tree().children
@@ -529,6 +543,8 @@ class XInterfaceBase(threading.Thread):
             return # window has been destroyed
                      
         for window in children:
+            if not self.__isViewable(window):
+                continue
             shouldTrigger = False
             
             if checkWinInfo:
@@ -571,6 +587,8 @@ class XInterfaceBase(threading.Thread):
             return # window has been destroyed
                      
         for window in children:
+            if not self.__isViewable(window):
+                continue
             shouldTrigger = False
             
             if checkWinInfo:
@@ -1030,6 +1048,13 @@ class XInterfaceBase(threading.Thread):
                     for x in range(self.localDisplay.pending_events()):
                         event = self.localDisplay.next_event()
                         if event.type == X.CreateNotify:
+                            createdWindows.append(event.window)
+                        if event.type == X.MapNotify:
+                            # Needed now that unmapped windows are skipped: a window
+                            # that existed but was unmapped when the tree was walked
+                            # would otherwise never be grabbed. Also a second chance
+                            # for windows whose WM_CLASS is set after creation, which
+                            # CreateNotify alone can miss.
                             createdWindows.append(event.window)
                         if event.type == X.DestroyNotify:
                             destroyedWindows.append(event.window)
