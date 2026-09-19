@@ -292,12 +292,9 @@ class XInterfaceBase(threading.Thread):
         self.rootWindow.change_attributes(event_mask=X.SubstructureNotifyMask|X.StructureNotifyMask)
         
         altList = self.localDisplay.keysym_to_keycodes(XK.XK_ISO_Level3_Shift)
-        self.__usableOffsets = (0, 1)
-        for code, offset in altList:
-            if code == 108 and offset == 0:
-                self.__usableOffsets += (4, 5)
-                logger.debug("Enabling sending using Alt-Grid")
-                break
+        self.__usableOffsets = self._usable_offsets(altList)
+        if len(self.__usableOffsets) > 2:
+            logger.debug("Enabling sending using Alt-Grid")
 
         # Build modifier mask mapping
         self.modMasks = {}
@@ -734,6 +731,30 @@ class XInterfaceBase(threading.Thread):
     def __ungrabKeyboard(self):
         self.localDisplay.ungrab_keyboard(X.CurrentTime)
         self.localDisplay.flush()
+
+    @staticmethod
+    def _usable_offsets(alt_list):
+        """
+        Which keysym offsets AutoKey can reach when sending.
+
+        Offsets 0 and 1 are always available. Offsets 4 and 5 are the AltGr
+        levels, reachable only if the keyboard actually has an AltGr key, i.e. a
+        keycode whose own symbol is ISO_Level3_Shift.
+
+        This used to require that key to be keycode 108 specifically, which is
+        only true of a stock layout. A keyboard that puts ISO_Level3_Shift
+        anywhere else -- including one where keycode 108 is Control_R and AltGr
+        sits on 92 -- was silently left with offsets (0, 1), so every character
+        living on an AltGr level was treated as unreachable. AutoKey then rewrote
+        the keyboard mapping to borrow a spare keycode for it, and never restored
+        it.
+        """
+        offsets = (0, 1)
+        for code, offset in alt_list:
+            if offset == 0:
+                offsets += (4, 5)
+                break
+        return offsets
 
     def __findUsableKeycode(self, codeList):
         for code, offset in codeList:
