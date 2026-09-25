@@ -100,32 +100,6 @@ def test_modifier_keysyms_resolve_to_the_left_hand_variant():
     assert_that(AK_TO_XK_MAP[Key.SHIFT], is_(XK.XK_Shift_L))
 
 
-def test_clear_modifiers_keeps_modifiers_the_string_reapplies():
-    """
-    A hotkey like <ctrl>+<shift>+[ bound to a script that sends <ctrl>+<page_up>
-    must not have its Ctrl released and immediately re-pressed while the user is
-    still holding it: the application then sees the modifier go down, up, down and
-    up again, which at best is wasted churn and at worst confuses it.
-    """
-    mediator = MagicMock()
-    mediator.releasedModifiers = []
-    mediator.modifiers = {Key.CONTROL: True, Key.SHIFT: True, Key.HYPER: True}
-
-    IoMediator._clear_modifiers(mediator, keep={"<ctrl>"})
-
-    assert_that(mediator.releasedModifiers, contains_inanyorder(Key.SHIFT, Key.HYPER))
-    assert_that(mediator.releasedModifiers, is_not(has_item(Key.CONTROL)))
-
-
-@pytest.mark.parametrize("string, expected", [
-    ["<ctrl>+<np_page_up>", {"<ctrl>"}],
-    ["<ctrl>+<shift>+v", {"<ctrl>", "<shift>"}],
-    ["plain text", set()],
-])
-def test_modifiers_applied_by(string, expected):
-    assert_that(IoMediator._modifiers_applied_by(MagicMock(), string), is_(expected))
-
-
 @pytest.mark.parametrize("string, types_chars", [
     # Explicit key combinations and special keys type nothing.
     ["<ctrl>+<np_page_up>", False],

@@ -153,12 +153,6 @@ class IoMediator(threading.Thread):
         string = string.replace('\t', "<tab>")
         
         logger.debug("Send via event interface")
-        # Do not release a modifier this very string is about to apply. A hotkey
-        # such as <ctrl>+<shift>+[ bound to a script that sends <ctrl>+<page_up>
-        # would otherwise have its Ctrl released and immediately pressed again
-        # while the user is still physically holding it, and the receiving
-        # application sees the modifier go down, up, down and up again. Leaving it
-        # alone keeps the state the application sees consistent.
         # Only clear when the string actually types characters. Clearing exists so
         # that held modifiers do not corrupt typed text; a string that only sends an
         # explicit key combination, such as "<ctrl>+<page_up>", types nothing and has
@@ -166,7 +160,7 @@ class IoMediator(threading.Thread):
         # for no benefit: Chrome measurably drops or delays the synthetic key that
         # follows a real modifier release, losing around 40% of rapid presses.
         if self._types_characters(string):
-            self._clear_modifiers(keep=self._modifiers_applied_by(string))
+            self._clear_modifiers()
         modifiers = []
         for section in KEY_SPLIT_RE.split(string):
             if len(section) > 0:
@@ -285,24 +279,10 @@ class IoMediator(threading.Thread):
             return True
         return False
 
-    def _modifiers_applied_by(self, string):
-        """
-        The modifiers this string will apply itself, e.g. {'<ctrl>'} for
-        "<ctrl>+<page_up>". Parsed the same way send_string() parses it.
-        """
-        applied = set()
-        for section in KEY_SPLIT_RE.split(string):
-            if len(section) > 1 and section[-1] == '+' \
-                    and Key.is_key(section[:-1]) and section[:-1] in MODIFIERS:
-                applied.add(section[:-1])
-        return applied
-
-    def _clear_modifiers(self, keep=()):
+    def _clear_modifiers(self):
         self.releasedModifiers = []
         
         for modifier in list(self.modifiers.keys()):
-            if modifier in keep:
-                continue
             if self.modifiers[modifier] and modifier not in (Key.CAPSLOCK, Key.NUMLOCK):
                 self.releasedModifiers.append(modifier)
                 # IoMediator.release_key(), not interface.release_key(): the latter
